@@ -1,0 +1,81 @@
+version: "3.9"
+
+# Run DAEMON sidecar alongside your existing OpenClaw install.
+# OpenClaw should already be running on the host with its gateway
+# accessible at ws://localhost:18789.
+
+services:
+  daemon-sidecar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: daemon-sidecar
+    ports:
+      - "8400:8400"                        # REST API for OpenClaw skills
+    volumes:
+      - ./daemon.yaml:/app/daemon.yaml:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro   # Screen capture (Linux, optional)
+    devices:
+      - /dev/snd:/dev/snd                  # Audio input (Linux, optional)
+    environment:
+      - DATABASE_URL=postgresql://daemon:daemon@daemon-db:5432/daemon
+      - OPENCLAW_GATEWAY_URL=${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:18789}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - API_PORT=8400
+    depends_on:
+      daemon-db:
+        condition: service_healthy
+      daemon-whisper:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  daemon-db:
+    image: pgvector/pgvector:pg16
+    container_name: daemon-db
+    environment:
+      POSTGRES_USER: daemon
+      POSTGRES_PASSWORD: daemon
+      POSTGRES_DB: daemon
+    volumes:
+      - daemon-pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daemon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  daemon-whisper:
+    image: fedirz/faster-whisper-server:latest
+    container_name: daemon-whisper
+    ports:
+      - "8500:8000"
+    environment:
+      - WHISPER__MODEL=Systran/faster-whisper-base.en
+    restart: unless-stopped
+    # Uncomment to enable GPU acceleration (requires nvidia-container-toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  daemon-ollama:
+    image: ollama/ollama:latest
+    container_name: daemon-ollama
+    volumes:
+      - ollama-models:/root/.ollama
+    ports:
+      - "11435:11434"                      # Different port from OpenClaw's Ollama
+    restart: unless-stopped
+
+volumes:
+  daemon-pgdata:
+  ollama-models:

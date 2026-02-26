@@ -1,0 +1,80 @@
+# DAEMON Sidecar configuration
+# All values can be overridden with environment variables.
+# See .env.example for the available env var names.
+
+# PostgreSQL + pgvector connection string
+memory_db_url: "postgresql://daemon:daemon@localhost:5433/daemon"
+
+# OpenClaw Gateway WebSocket URL
+openclaw_gateway_url: "ws://localhost:18789"
+
+# Port for the sidecar REST API
+api_port: 8400
+
+perception:
+  # Enable/disable individual sensors
+  audio_enabled: true
+  screen_enabled: true
+  video_enabled: false          # opt-in — requires camera access
+
+  # Faster-Whisper server for speech-to-text
+  whisper_url: "http://localhost:8500"
+
+  # Voice Activity Detection sensitivity (0.0–1.0)
+  vad_threshold: 0.5
+
+  # How often (seconds) to capture a screenshot
+  screen_interval_seconds: 30
+
+consciousness:
+  # Seconds of inactivity before transitioning to light sleep
+  idle_timeout_seconds: 300     # 5 minutes
+
+  # Seconds of inactivity before transitioning to deep sleep
+  deep_sleep_timeout_seconds: 3600  # 1 hour
+
+  # Automatically wake when audio is detected
+  wake_on_audio: true
+
+  # Automatically wake when a user message arrives
+  wake_on_message: true
+
+proactive:
+  # Master on/off switch for proactive messages
+  enabled: true
+
+  # Maximum proactive interrupts per hour
+  interrupt_budget_per_hour: 10
+
+  # Minimum salience score (0.0–1.0) required to trigger a proactive message
+  min_salience_threshold: 0.6
+
+  # Quiet hours (24-hour clock, local time) — no proactive messages during this window
+  quiet_hours_start: 22         # 10 PM
+  quiet_hours_end: 8            # 8 AM
+
+safety:
+  # Side-effect patterns → permission tiers
+  # Tier 0: auto-approve, no log
+  tier0_patterns:
+    - "file:read"
+    - "http:get"
+    - "memory:read"
+
+  # Tier 1: auto-approve, log the action
+  tier1_patterns:
+    - "file:write"
+    - "http:post"
+    - "shell:run"
+
+  # Tier 2: STOP — requires explicit human approval
+  tier2_patterns:
+    - "email:send"
+    - "calendar:create"
+    - "message:send"
+
+  # Tier 3: STOP — destructive, full explanation required
+  tier3_patterns:
+    - "file:delete"
+    - "purchase:make"
+    - "account:modify"

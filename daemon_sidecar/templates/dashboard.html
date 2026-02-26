@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DAEMON Dashboard</title>
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #58a6ff;
+      --green:     #3fb950;
+      --yellow:    #d29922;
+      --red:       #f85149;
+      --purple:    #bc8cff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.04em; }
+    header .subtitle { color: var(--muted); font-size: 12px; }
+    .pulse {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.4);
+      animation: pulse 2s infinite;
+    }
+    .pulse.offline { background: var(--red); box-shadow: none; animation: none; }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.5); }
+      70%  { box-shadow: 0 0 0 8px rgba(63, 185, 80, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { main { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .card.wide { grid-column: 1 / -1; }
+    .card h2 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* Consciousness */
+    .consciousness-level {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .consciousness-level.DEEP_SLEEP  { color: var(--muted); }
+    .consciousness-level.LIGHT_SLEEP { color: var(--yellow); }
+    .consciousness-level.AMBIENT     { color: var(--accent); }
+    .consciousness-level.ENGAGED     { color: var(--green); }
+    .consciousness-level.FOCUSED     { color: var(--purple); }
+    .sensor-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .pill {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    /* Stats */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .stat { }
+    .stat-value { font-size: 28px; font-weight: 700; }
+    .stat-label { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .stat-value.warn { color: var(--yellow); }
+    .stat-value.ok   { color: var(--green); }
+
+    /* Bridge */
+    .bridge-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .badge.ok     { background: rgba(63,185,80,0.15);  color: var(--green); }
+    .badge.error  { background: rgba(248,81,73,0.15);  color: var(--red);   }
+    .bridge-detail { color: var(--muted); font-size: 12px; }
+
+    /* Ledger */
+    .ledger-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .ledger-table th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 500;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ledger-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tier-0 { color: var(--muted); }
+    .tier-1 { color: var(--accent); }
+    .tier-2 { color: var(--yellow); }
+    .tier-3 { color: var(--red); }
+
+    /* Events */
+    .event-list { list-style: none; }
+    .event-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+      font-size: 12px;
+    }
+    .event-item:last-child { border-bottom: none; }
+    .salience-bar {
+      width: 4px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      align-self: stretch;
+      min-height: 20px;
+    }
+    .event-text { color: var(--text); flex: 1; }
+    .event-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .empty { color: var(--muted); font-style: italic; text-align: center; padding: 20px 0; }
+
+    .refresh-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      padding: 16px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="pulse" id="status-dot"></div>
+    <div>
+      <h1>DAEMON</h1>
+      <div class="subtitle">Sidecar Dashboard</div>
+    </div>
+    <div style="margin-left:auto; color:var(--muted); font-size:12px;" id="last-updated">—</div>
+  </header>
+
+  <main>
+    <!-- Consciousness -->
+    <div class="card">
+      <h2>Consciousness</h2>
+      <div class="consciousness-level" id="c-level">—</div>
+      <div class="sensor-pills" id="c-sensors"></div>
+      <div style="color:var(--muted);font-size:11px;margin-top:10px;" id="c-last-event"></div>
+    </div>
+
+    <!-- Memory & Ledger -->
+    <div class="card">
+      <h2>Memory &amp; Ledger</h2>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-value" id="s-memory">—</div>
+          <div class="stat-label">Stored episodes</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="s-ledger">—</div>
+          <div class="stat-label">Ledger entries today</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="s-pending">—</div>
+          <div class="stat-label">Pending approvals</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="s-events">—</div>
+          <div class="stat-label">Salient events / hr</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Costs -->
+    <div class="card">
+      <h2>Cost Tracker</h2>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-value" id="s-cost-today">—</div>
+          <div class="stat-label">USD today</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="s-cost-hour">—</div>
+          <div class="stat-label">USD this hour</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bridge -->
+    <div class="card">
+      <h2>OpenClaw Bridge</h2>
+      <div class="bridge-row">
+        <span class="badge" id="bridge-badge">—</span>
+        <span class="bridge-detail" id="bridge-url">—</span>
+      </div>
+      <div class="bridge-detail" id="bridge-sent"></div>
+      <div class="bridge-detail" id="bridge-queued"></div>
+      <div class="bridge-detail" id="bridge-connected-at"></div>
+    </div>
+
+    <!-- Recent salient events -->
+    <div class="card wide">
+      <h2>Recent High-Salience Events</h2>
+      <ul class="event-list" id="event-list">
+        <li class="empty">No events yet</li>
+      </ul>
+    </div>
+
+    <!-- Audit ledger -->
+    <div class="card wide">
+      <h2>Audit Ledger (last 20)</h2>
+      <div style="overflow-x:auto;">
+        <table class="ledger-table">
+          <thead>
+            <tr>
+              <th>Tier</th>
+              <th>Tool</th>
+              <th>Side-effect</th>
+              <th>Reversible</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-body">
+            <tr><td colspan="5" class="empty">No entries</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <div class="refresh-note">Auto-refreshes every 5 seconds</div>
+
+  <script>
+    const TIER_LABELS = ['read-only', 'logged', 'approval-req', 'destructive'];
+    const TIER_CLASS  = ['tier-0',   'tier-1', 'tier-2',       'tier-3'];
+
+    function salienceColor(s) {
+      if (s >= 0.8) return '#f85149';
+      if (s >= 0.6) return '#d29922';
+      if (s >= 0.4) return '#58a6ff';
+      return '#8b949e';
+    }
+
+    async function fetchJSON(url) {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(r.statusText);
+      return r.json();
+    }
+
+    async function refresh() {
+      try {
+        const [overview, events, ledger] = await Promise.all([
+          fetchJSON('/api/dashboard/overview'),
+          fetchJSON('/api/perception/events?min_salience=0.3&minutes=60'),
+          fetchJSON('/api/dashboard/ledger?limit=20'),
+        ]);
+
+        // Status dot
+        document.getElementById('status-dot').className = 'pulse';
+        document.getElementById('last-updated').textContent =
+          'Updated ' + new Date().toLocaleTimeString();
+
+        // Consciousness
+        const level = overview.consciousness;
+        const el = document.getElementById('c-level');
+        el.textContent = level.replace('_', ' ');
+        el.className = 'consciousness-level ' + level;
+
+        const sensors = document.getElementById('c-sensors');
+        sensors.innerHTML = (overview.active_sensors || [])
+          .map(s => `<span class="pill">${s}</span>`)
+          .join('') || '<span style="color:var(--muted);font-size:12px;">no sensors active</span>';
+
+        const lastEvent = overview.last_significant_event;
+        document.getElementById('c-last-event').textContent =
+          lastEvent ? 'Last event: ' + new Date(lastEvent).toLocaleTimeString() : '';
+
+        // Stats
+        document.getElementById('s-memory').textContent = fmt(overview.memory_count);
+        document.getElementById('s-ledger').textContent = fmt(overview.ledger_entries_today);
+        const pending = overview.pending_approvals;
+        const pendEl = document.getElementById('s-pending');
+        pendEl.textContent = fmt(pending);
+        pendEl.className = 'stat-value' + (pending > 0 ? ' warn' : ' ok');
+        document.getElementById('s-events').textContent = fmt(overview.salient_events_last_hour);
+
+        // Costs
+        document.getElementById('s-cost-today').textContent =
+          '$' + (overview.costs_today || 0).toFixed(4);
+        document.getElementById('s-cost-hour').textContent =
+          '$' + (overview.costs_this_hour || 0).toFixed(4);
+
+        // Bridge
+        const br = overview.bridge || {};
+        const badge = document.getElementById('bridge-badge');
+        badge.textContent = br.connected ? 'Connected' : 'Offline';
+        badge.className = 'badge ' + (br.connected ? 'ok' : 'error');
+        document.getElementById('bridge-url').textContent = br.gateway_url || '';
+        document.getElementById('bridge-sent').textContent =
+          `${fmt(br.messages_sent || 0)} messages sent`;
+        document.getElementById('bridge-queued').textContent =
+          `${fmt(br.queued_messages || 0)} queued`;
+        document.getElementById('bridge-connected-at').textContent =
+          br.connected_at ? 'Since ' + new Date(br.connected_at).toLocaleTimeString() : '';
+
+        // Events
+        const evList = document.getElementById('event-list');
+        const evs = (events.events || []).slice(0, 10);
+        if (evs.length === 0) {
+          evList.innerHTML = '<li class="empty">No salient events in the last hour</li>';
+        } else {
+          evList.innerHTML = evs.map(e => `
+            <li class="event-item">
+              <div class="salience-bar" style="background:${salienceColor(e.salience)}"></div>
+              <div>
+                <div class="event-text">${esc(e.transcription || '(no text)')}</div>
+                <div class="event-meta">
+                  ${e.sensor_type} &middot; salience ${(e.salience * 100).toFixed(0)}%
+                  &middot; ${fmtTime(e.timestamp)}
+                </div>
+              </div>
+            </li>`).join('');
+        }
+
+        // Ledger
+        const tbody = document.getElementById('ledger-body');
+        const entries = (ledger.entries || []);
+        if (entries.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty">No entries yet</td></tr>';
+        } else {
+          tbody.innerHTML = entries.map(e => `
+            <tr>
+              <td class="${TIER_CLASS[e.permission_tier] || 'tier-0'}">
+                T${e.permission_tier} ${TIER_LABELS[e.permission_tier] || ''}
+              </td>
+              <td>${esc(e.tool_name)}</td>
+              <td>${esc(e.side_effect_type)}</td>
+              <td>${e.reversible ? '✓' : '✗'}</td>
+              <td>${fmtTime(e.timestamp)}</td>
+            </tr>`).join('');
+        }
+
+      } catch (err) {
+        document.getElementById('status-dot').className = 'pulse offline';
+        document.getElementById('last-updated').textContent = 'Error: ' + err.message;
+      }
+    }
+
+    function fmt(n) { return (n || 0).toLocaleString(); }
+    function esc(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function fmtTime(ts) {
+      if (!ts) return '';
+      return new Date(ts).toLocaleTimeString();
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

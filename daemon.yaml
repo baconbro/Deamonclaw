@@ -15,16 +15,21 @@ perception:
   # Enable/disable individual sensors
   audio_enabled: true
   screen_enabled: true
-  video_enabled: false          # opt-in — requires camera access
+  video_enabled: false          # opt-in — requires camera/OpenCV access
 
-  # Faster-Whisper server for speech-to-text
+  # Faster-Whisper server for speech-to-text (Phase 2)
   whisper_url: "http://localhost:8500"
 
-  # Voice Activity Detection sensitivity (0.0–1.0)
+  # Voice Activity Detection sensitivity mapped to webrtcvad aggressiveness (0.0–1.0)
+  # 0.0 = aggressiveness 0 (least aggressive), 1.0 = aggressiveness 3 (most aggressive)
   vad_threshold: 0.5
 
-  # How often (seconds) to capture a screenshot
+  # How often (seconds) to capture a screenshot (screen sensor)
   screen_interval_seconds: 30
+
+  # Video sensor (opt-in via video_enabled: true)
+  # video_device_index: 0           # webcam device index (default 0)
+  # video_motion_threshold: 0.02    # fraction of changed pixels to trigger event
 
 consciousness:
   # Seconds of inactivity before transitioning to light sleep

@@ -139,11 +139,20 @@ power level, active sensors, and costs.
 | `POST` | `/api/consciousness/wake?level=engaged` | Force wake |
 | `POST` | `/api/consciousness/sleep` | Force deep sleep |
 
+### Bridge (Phase 3)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/bridge/inject-context` | Build + inject `<daemon_context>` XML |
+| `GET` | `/api/bridge/status` | WebSocket connection health |
+
 ### Dashboard
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/dashboard/overview` | Full status overview |
+| `GET` | `/` | Web dashboard UI |
+| `GET` | `/api/dashboard/overview` | Full JSON status overview |
+| `GET` | `/api/dashboard/ledger?limit=20` | Recent audit ledger entries |
 
 ## Configuration
 
@@ -165,20 +174,31 @@ All values can be overridden with environment variables (see `.env.example`).
 - [x] OpenClaw skills (memory, safety, perception, context)
 - [x] Docker Compose stack
 
-### Phase 2 (Weeks 3–4): Perception
-- [ ] Real audio sensor with VAD + Whisper integration
-- [ ] Real screen sensor with OCR (pytesseract / easyocr)
-- [ ] Embedding-based salience scoring
+### Phase 2 (Weeks 3–4): Perception ✓
+- [x] Real audio sensor — pyaudio + webrtcvad VAD + Whisper HTTP transcription
+- [x] Real screen sensor — mss screenshot + pytesseract OCR + xdotool window title
+- [x] Video sensor — opencv motion detection, opt-in (disabled by default)
+- [x] Embedding-based salience scoring — sentence-transformers `all-MiniLM-L6-v2`
+- [x] Vector recall — pgvector cosine similarity search for memory recall
+- [x] Embedding storage — episodes stored with embedding vectors for semantic lookup
 
-### Phase 3 (Weeks 5–6): Proactive + Bridge
-- [ ] Full OpenClaw gateway WebSocket integration
-- [ ] Context injection into OpenClaw conversations
-- [ ] Event listener for live ledger population
+### Phase 3 (Weeks 5–6): Proactive + Bridge ✓
+- [x] Full OpenClaw gateway WebSocket integration with outbound message queue
+- [x] Automatic reconnect with exponential backoff (2 → 4 → 8 → 16 → 32 → 60s)
+- [x] Message queue — up to 50 messages buffered while offline, flushed on reconnect
+- [x] Context builder — assembles `<daemon_context>` XML from audio, screen, memories
+- [x] Context injection into OpenClaw conversations via `POST /api/bridge/inject-context`
+- [x] Event listener — monitors all OpenClaw WebSocket events for live ledger population
+- [x] Bridge status endpoint — `GET /api/bridge/status`
 
-### Phase 4 (Weeks 7–8): Polish
-- [ ] Web dashboard UI
-- [ ] Video sensor (opt-in)
-- [ ] ClawHub skill publication
+### Phase 4 (Weeks 7–8): Polish ✓
+- [x] Web dashboard — dark-theme UI served at `/`, auto-refreshes every 5 seconds
+  - Consciousness level with animated indicator
+  - Active sensors, salient events list, cost tracker
+  - Bridge connection status, pending approvals
+  - Audit ledger table with tier colour coding
+- [x] Video sensor — motion-detected webcam events with JPEG thumbnails
+- [x] ClawHub publish script — `clawhub/publish.sh`
 
 ## License
 

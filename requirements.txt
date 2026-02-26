@@ -1,7 +1,33 @@
+# ── Core API ──────────────────────────────────────────────────────────────────
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 pydantic>=2.7.0
+jinja2>=3.1.4
+
+# ── Database ──────────────────────────────────────────────────────────────────
 asyncpg>=0.29.0
+
+# ── Configuration ─────────────────────────────────────────────────────────────
 pyyaml>=6.0.1
+
+# ── OpenClaw bridge ───────────────────────────────────────────────────────────
 websockets>=12.0
 httpx>=0.27.0
+
+# ── Phase 2: Audio sensor ─────────────────────────────────────────────────────
+# pyaudio requires portaudio19-dev system package (see Dockerfile)
+pyaudio>=0.2.14; sys_platform != "darwin" or sys_platform != "win32"
+webrtcvad>=2.0.10
+
+# ── Phase 2: Screen sensor ────────────────────────────────────────────────────
+mss>=9.0.1
+Pillow>=10.3.0
+pytesseract>=0.3.10
+
+# ── Phase 2: Video sensor (opt-in) ────────────────────────────────────────────
+# Headless build avoids pulling in Qt/GTK GUI dependencies
+opencv-python-headless>=4.9.0.80
+numpy>=1.26.0
+
+# ── Phase 2: Embedding-based salience ─────────────────────────────────────────
+sentence-transformers>=3.0.0

@@ -90,9 +90,8 @@ class EpisodicMemory:
         logger.debug("Stored episode %s", episode.id)
 
     async def recall(self, query: str, limit: int = 5) -> list[Episode]:
-        """Semantic recall; falls back to text search when no embedding available."""
+        """Text-based recall (keyword ILIKE search over goal, outcome, tags)."""
         async with self._pool.acquire() as conn:
-            # Text-based fallback search (tsquery over goal + outcome)
             rows = await conn.fetch(
                 """
                 SELECT id, type, goal, outcome, success, tools_used, tags, created_at
@@ -105,6 +104,44 @@ class EpisodicMemory:
                 limit,
             )
         return [self._row_to_episode(r) for r in rows]
+
+    async def recall_semantic(
+        self,
+        embedding: list[float],
+        limit: int = 5,
+    ) -> list[Episode]:
+        """
+        Vector similarity recall using pgvector cosine distance.
+
+        Requires that episodes were stored with an embedding vector.
+        Falls back gracefully (returns empty list) when no embedded episodes exist.
+        """
+        async with self._pool.acquire() as conn:
+            try:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, type, goal, outcome, success, tools_used, tags, created_at
+                    FROM episodes
+                    WHERE embedding IS NOT NULL
+                    ORDER BY embedding <=> $1::vector
+                    LIMIT $2
+                    """,
+                    embedding,
+                    limit,
+                )
+            except Exception as exc:
+                logger.warning("recall_semantic: vector query failed (%s), returning empty", exc)
+                return []
+        return [self._row_to_episode(r) for r in rows]
+
+    async def store_with_embedding(
+        self,
+        episode: "Episode",
+        embedding: list[float],
+    ) -> None:
+        """Store an episode together with its pre-computed embedding vector."""
+        episode.embedding = embedding
+        await self.store(episode)
 
     async def get_recent(self, limit: int = 10) -> list[Episode]:
         async with self._pool.acquire() as conn:

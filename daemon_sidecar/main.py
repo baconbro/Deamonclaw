@@ -1,16 +1,19 @@
 """
 DAEMON Sidecar — runs alongside OpenClaw, provides:
 
-1. Perception pipeline  (audio / video / screen sensors)
-2. Structured memory    (PostgreSQL + pgvector)
-3. Safety layer         (permission tiers, side-effect ledger)
-4. Consciousness mgr    (sleep/wake states, power levels)
-5. Proactive engine     (interrupt budget, quiet hours)
-6. REST API             (called by OpenClaw skills)
+1. Perception pipeline  (audio / video / screen sensors)          Phase 2
+2. Structured memory    (PostgreSQL + pgvector, vector recall)     Phase 2
+3. Safety layer         (permission tiers, side-effect ledger)     Phase 1
+4. Consciousness mgr    (sleep/wake states, power levels)          Phase 1
+5. Proactive engine     (interrupt budget, quiet hours)            Phase 1
+6. Context builder      (daemon_context XML injection)             Phase 3
+7. Bridge management    (queue, reconnect, status)                 Phase 3
+8. REST API             (called by OpenClaw skills)                Phase 1
+9. Web dashboard        (served at /)                              Phase 4
 
 Communication with OpenClaw:
   • REST API           — OpenClaw skills → sidecar (Integration Point 1)
-  • WebSocket client   — sidecar → OpenClaw gateway for proactive msgs (Point 2)
+  • WebSocket client   — sidecar → OpenClaw gateway proactive msgs (Point 2)
   • WebSocket listener — sidecar monitors all OpenClaw events (Point 3)
 """
 
@@ -21,17 +24,23 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
+from daemon_sidecar.bridges.context_builder import ContextBuilder
 from daemon_sidecar.bridges.event_listener import CostTracker, OpenClawEventListener
 from daemon_sidecar.bridges.openclaw_bridge import OpenClawBridge
 from daemon_sidecar.config import load_config
 from daemon_sidecar.consciousness.manager import ConsciousnessManager
+from daemon_sidecar.memory.embeddings import EmbeddingSalienceScorer
 from daemon_sidecar.memory.episodic import EpisodicMemory
 from daemon_sidecar.models import (
     Episode,
-    LogActionRequest,
     LedgerEntry,
+    LogActionRequest,
     PermissionCheckRequest,
     PowerLevel,
     RecallRequest,
@@ -66,6 +75,10 @@ async def lifespan(app: FastAPI):
         app.state.memory = None
         app.state.ledger = None
 
+    # ── Embedding scorer (shared by memory recall + context builder) ───────────
+    app.state.scorer = EmbeddingSalienceScorer()
+    await app.state.scorer.initialize()
+
     # ── Safety ────────────────────────────────────────────────────────────────
     app.state.permissions = PermissionGate(config.safety)
 
@@ -83,7 +96,7 @@ async def lifespan(app: FastAPI):
     app.state.proactive = ProactiveEngine(config.proactive)
     app.state.proactive.set_bridge(app.state.bridge)
 
-    # ── Event listener (OpenClaw → sidecar) ───────────────────────────────────
+    # ── Event listener (OpenClaw → sidecar, Integration Point 3) ─────────────
     if app.state.memory and app.state.ledger:
         app.state.event_listener = OpenClawEventListener(
             gateway_url=config.openclaw_gateway_url,
@@ -94,7 +107,7 @@ async def lifespan(app: FastAPI):
         )
         asyncio.create_task(app.state.event_listener.listen())
 
-    # ── Perception bus ────────────────────────────────────────────────────────
+    # ── Perception bus (Phase 2: real sensors) ────────────────────────────────
     app.state.perception = PerceptionBus(
         config=config.perception,
         consciousness=app.state.consciousness,
@@ -102,6 +115,15 @@ async def lifespan(app: FastAPI):
         bridge=app.state.bridge,
     )
     await app.state.perception.start()
+
+    # ── Context builder (Phase 3) ─────────────────────────────────────────────
+    app.state.context_builder = ContextBuilder(
+        perception=app.state.perception,
+        memory=app.state.memory,
+        consciousness=app.state.consciousness,
+        permissions=app.state.permissions,
+        scorer=app.state.scorer,
+    )
 
     logger.info("DAEMON sidecar ready on port %d", config.api_port)
     yield
@@ -114,9 +136,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="DAEMON Sidecar",
     description="Perception, memory, and safety layer for OpenClaw",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
+
+# ── Static files + Jinja2 templates (Phase 4 dashboard) ───────────────────────
+import pathlib
+_HERE = pathlib.Path(__file__).parent
+_STATIC = _HERE / "static"
+_TEMPLATES_DIR = _HERE / "templates"
+_STATIC.mkdir(exist_ok=True)
+_TEMPLATES_DIR.mkdir(exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
+templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 
 def _require_memory() -> EpisodicMemory:
@@ -133,21 +166,44 @@ def _require_ledger() -> SideEffectLedger:
     return ledger
 
 
+# ── Dashboard (Phase 4) ────────────────────────────────────────────────────────
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard_ui(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
 # ── Memory API (Integration Point 1: called by daemon-memory skill) ───────────
 
 @app.post("/api/memory/store")
 async def store_memory(request: StoreMemoryRequest) -> dict[str, Any]:
     memory = _require_memory()
     episode = Episode.from_request(request)
-    await memory.store(episode)
+
+    # Generate and attach embedding if scorer is available
+    embedding = await app.state.scorer.embed(f"{episode.goal} {episode.outcome}")
+    if embedding:
+        await memory.store_with_embedding(episode, embedding)
+    else:
+        await memory.store(episode)
+
     return {"stored": True, "id": episode.id}
 
 
 @app.post("/api/memory/recall")
 async def recall_memory(request: RecallRequest) -> dict[str, Any]:
     memory = _require_memory()
+
+    # Try vector recall first
+    embedding = await app.state.scorer.embed(request.query)
+    if embedding:
+        results = await memory.recall_semantic(embedding, limit=request.limit)
+        if results:
+            return {"memories": [r.to_summary() for r in results], "method": "semantic"}
+
+    # Fall back to text search
     results = await memory.recall(query=request.query, limit=request.limit)
-    return {"memories": [r.to_summary() for r in results]}
+    return {"memories": [r.to_summary() for r in results], "method": "text"}
 
 
 @app.get("/api/memory/recent")
@@ -237,22 +293,70 @@ async def sleep() -> dict[str, Any]:
     return {"level": "DEEP_SLEEP"}
 
 
-# ── Dashboard API (for future web UI) ─────────────────────────────────────────
+# ── Bridge API (Phase 3) ───────────────────────────────────────────────────────
+
+class InjectContextRequest(BaseModel):
+    user_query: str = ""
+    audio_minutes: int = 5
+    memory_limit: int = 3
+
+
+@app.post("/api/bridge/inject-context")
+async def inject_context(request: InjectContextRequest) -> dict[str, Any]:
+    """
+    Build and inject <daemon_context> into OpenClaw's next LLM call.
+
+    Called by OpenClaw's skill system before each agent response when the
+    daemon-context skill is active.
+    """
+    context_xml = await app.state.context_builder.build(
+        user_query=request.user_query,
+        audio_minutes=request.audio_minutes,
+        memory_limit=request.memory_limit,
+    )
+    if context_xml:
+        await app.state.bridge.inject_context(context_xml)
+    return {"injected": bool(context_xml), "length": len(context_xml)}
+
+
+@app.get("/api/bridge/status")
+async def bridge_status() -> dict[str, Any]:
+    """Return OpenClaw bridge connection health."""
+    return app.state.bridge.status()
+
+
+# ── Dashboard API ──────────────────────────────────────────────────────────────
 
 @app.get("/api/dashboard/overview")
-async def dashboard() -> dict[str, Any]:
+async def dashboard_overview() -> dict[str, Any]:
     c = app.state.consciousness
     memory_count = await app.state.memory.count() if app.state.memory else 0
     ledger_today = await app.state.ledger.count_today() if app.state.ledger else 0
     pending = await app.state.permissions.pending_count()
+    salient = await app.state.perception.get_salient_events(min_salience=0.5, minutes=60)
     return {
         "consciousness": c.current_level.name,
+        "active_sensors": c.active_sensors(),
+        "last_significant_event": c.last_significant_event,
         "memory_count": memory_count,
         "ledger_entries_today": ledger_today,
-        "costs_today": app.state.costs.today_total(),
-        "active_sensors": c.active_sensors(),
+        "costs_today": round(app.state.costs.today_total(), 4),
+        "costs_this_hour": round(app.state.costs.current_hour_total(), 4),
         "pending_approvals": pending,
+        "salient_events_last_hour": len(salient),
+        "bridge": app.state.bridge.status(),
     }
+
+
+@app.get("/api/dashboard/ledger")
+async def dashboard_ledger(limit: int = 20) -> dict[str, Any]:
+    ledger = _require_ledger()
+    entries = await ledger.get_recent(limit)
+    # Convert datetime objects for JSON
+    for e in entries:
+        if hasattr(e.get("timestamp"), "isoformat"):
+            e["timestamp"] = e["timestamp"].isoformat()
+    return {"entries": entries}
 
 
 @app.get("/health")

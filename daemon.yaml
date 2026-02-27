@@ -58,6 +58,26 @@ proactive:
   quiet_hours_start: 22         # 10 PM
   quiet_hours_end: 8            # 8 AM
 
+thinking:
+  # Enable the continuous thinking engine (requires ANTHROPIC_API_KEY)
+  enabled: true
+
+  # Claude model to use for reasoning cycles
+  model: "claude-sonnet-4-6"
+
+  # Max tokens per thinking cycle (controls depth of reasoning)
+  max_tokens: 1024
+
+  # Thinking cadence per consciousness level (seconds between cycles)
+  # Lower = more frequent thinking when the user is active
+  cadence_focused:     20    # 20s when fully focused
+  cadence_engaged:     45    # 45s when engaged
+  cadence_ambient:    120    # 2 min when ambient
+  cadence_light_sleep: 600   # 10 min when light sleeping
+
+  # Automatically deliver <message> blocks to user via the OpenClaw bridge
+  auto_communicate: true
+
 safety:
   # Side-effect patterns → permission tiers
   # Tier 0: auto-approve, no log

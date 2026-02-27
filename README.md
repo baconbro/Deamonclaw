@@ -162,6 +162,7 @@ Edit `daemon.yaml` to customise:
 - **Consciousness** — idle and deep-sleep timeouts
 - **Proactive** — interrupt budget, quiet hours, salience threshold
 - **Safety** — tier patterns for permission classification
+- **Thinking** — Claude model, max tokens, cadence per consciousness level, auto_communicate flag
 
 All values can be overridden with environment variables (see `.env.example`).
 
@@ -190,6 +191,21 @@ All values can be overridden with environment variables (see `.env.example`).
 - [x] Context injection into OpenClaw conversations via `POST /api/bridge/inject-context`
 - [x] Event listener — monitors all OpenClaw WebSocket events for live ledger population
 - [x] Bridge status endpoint — `GET /api/bridge/status`
+
+### Continuous Thinking (ongoing) ✓
+- [x] `ContinuousThinkingEngine` — cadenced Claude reasoning loop while DAEMON is awake
+- [x] Two transparent output types streamed to the dashboard in real-time:
+  - `<think>` — inner monologue (italic, streamed live via SSE)
+  - `<message priority="…">` — official user communication (delivered via bridge)
+  - `<memory>` — auto-persists important observations to episodic memory
+- [x] Cadence adapts to consciousness level: 20s (focused) → 45s → 2min → 10min
+- [x] `GET /api/thinking/stream` — SSE endpoint for live thinking chunks
+- [x] `GET /api/thinking/history` — completed cycle ring buffer
+- [x] `GET /api/thinking/communications` — all generated user communications
+- [x] `POST /api/thinking/trigger` — manually trigger an immediate cycle
+- [x] Dashboard redesigned as a split-panel UI:
+  - Left: status cards + recent communications + audit ledger
+  - Right: **Live Stream** tab (inner monologue in real-time) + **Communications** tab
 
 ### Phase 4 (Weeks 7–8): Polish ✓
 - [x] Web dashboard — dark-theme UI served at `/`, auto-refreshes every 5 seconds

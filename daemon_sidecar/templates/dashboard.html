@@ -8,6 +8,7 @@
     :root {
       --bg:        #0d1117;
       --surface:   #161b22;
+      --surface2:  #1c2128;
       --border:    #30363d;
       --text:      #e6edf3;
       --muted:     #8b949e;
@@ -16,6 +17,9 @@
       --yellow:    #d29922;
       --red:       #f85149;
       --purple:    #bc8cff;
+      --orange:    #d18616;
+      --think-bg:  #0f1923;
+      --msg-bg:    #0d1f12;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,151 +30,304 @@
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       font-size: 14px;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
 
+    /* ── Header ─────────────────────────────────────────────────────────────── */
     header {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 16px 24px;
+      padding: 14px 24px;
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-shrink: 0;
     }
-    header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.04em; }
-    header .subtitle { color: var(--muted); font-size: 12px; }
+    header h1 { font-size: 17px; font-weight: 600; letter-spacing: 0.04em; }
+    header .subtitle { color: var(--muted); font-size: 11px; }
     .pulse {
       width: 10px; height: 10px; border-radius: 50%;
       background: var(--green);
       box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.4);
       animation: pulse 2s infinite;
+      flex-shrink: 0;
     }
     .pulse.offline { background: var(--red); box-shadow: none; animation: none; }
+    .pulse.thinking { background: var(--purple); box-shadow: 0 0 0 0 rgba(188,140,255,0.4); }
     @keyframes pulse {
       0%   { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.5); }
       70%  { box-shadow: 0 0 0 8px rgba(63, 185, 80, 0); }
       100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
     }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    #thinking-badge {
+      display: none;
+      font-size: 11px;
+      color: var(--purple);
+      background: rgba(188,140,255,0.12);
+      border: 1px solid rgba(188,140,255,0.3);
+      border-radius: 12px;
+      padding: 2px 10px;
+    }
+    #thinking-badge.active { display: inline; }
+    #last-updated { color: var(--muted); font-size: 11px; }
 
-    main {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px;
+    /* ── Two-column layout ──────────────────────────────────────────────────── */
+    .layout {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 380px;
+      flex: 1;
+      overflow: hidden;
+    }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    /* ── Left: status grid ──────────────────────────────────────────────────── */
+    .status-panel {
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
       gap: 16px;
     }
-    @media (max-width: 900px) { main { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 600px) { main { grid-template-columns: 1fr; } }
+
+    .cards-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 720px) { .cards-row { grid-template-columns: 1fr 1fr; } }
 
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 20px;
+      padding: 16px;
     }
-    .card.wide { grid-column: 1 / -1; }
     .card h2 {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--muted);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
+    .card.full { grid-column: 1 / -1; }
 
-    /* Consciousness */
-    .consciousness-level {
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
+    /* ── Consciousness ─────────────────────────────────────────────────────── */
+    .c-level {
+      font-size: 26px; font-weight: 700; letter-spacing: 0.02em;
     }
-    .consciousness-level.DEEP_SLEEP  { color: var(--muted); }
-    .consciousness-level.LIGHT_SLEEP { color: var(--yellow); }
-    .consciousness-level.AMBIENT     { color: var(--accent); }
-    .consciousness-level.ENGAGED     { color: var(--green); }
-    .consciousness-level.FOCUSED     { color: var(--purple); }
-    .sensor-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .c-level.DEEP_SLEEP  { color: var(--muted); }
+    .c-level.LIGHT_SLEEP { color: var(--yellow); }
+    .c-level.AMBIENT     { color: var(--accent); }
+    .c-level.ENGAGED     { color: var(--green); }
+    .c-level.FOCUSED     { color: var(--purple); }
+    .sensor-pills { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
     .pill {
-      background: rgba(88, 166, 255, 0.15);
+      background: rgba(88,166,255,0.12);
       color: var(--accent);
-      border: 1px solid rgba(88, 166, 255, 0.3);
+      border: 1px solid rgba(88,166,255,0.25);
       border-radius: 20px;
-      padding: 2px 10px;
-      font-size: 11px;
-      font-weight: 500;
+      padding: 1px 9px;
+      font-size: 10px; font-weight: 500;
     }
 
-    /* Stats */
-    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .stat { }
-    .stat-value { font-size: 28px; font-weight: 700; }
-    .stat-label { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    /* ── Stat grid ─────────────────────────────────────────────────────────── */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-value { font-size: 24px; font-weight: 700; }
+    .stat-label { color: var(--muted); font-size: 10px; margin-top: 2px; }
     .stat-value.warn { color: var(--yellow); }
     .stat-value.ok   { color: var(--green); }
 
-    /* Bridge */
-    .bridge-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    /* ── Bridge ─────────────────────────────────────────────────────────────── */
     .badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 4px;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 4px;
     }
-    .badge.ok     { background: rgba(63,185,80,0.15);  color: var(--green); }
-    .badge.error  { background: rgba(248,81,73,0.15);  color: var(--red);   }
-    .bridge-detail { color: var(--muted); font-size: 12px; }
+    .badge.ok    { background: rgba(63,185,80,0.15);  color: var(--green); }
+    .badge.error { background: rgba(248,81,73,0.15);  color: var(--red);   }
+    .bridge-detail { color: var(--muted); font-size: 11px; margin-top: 4px; }
 
-    /* Ledger */
-    .ledger-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    /* ── Communications strip ───────────────────────────────────────────────── */
+    .comm-list { list-style: none; }
+    .comm-item {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+      font-size: 12px;
+    }
+    .comm-item:last-child { border-bottom: none; }
+    .comm-priority {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    .comm-priority.low    { color: var(--muted); }
+    .comm-priority.normal { color: var(--accent); }
+    .comm-priority.high   { color: var(--yellow); }
+    .comm-priority.urgent { color: var(--red); }
+    .comm-time { color: var(--muted); font-size: 10px; margin-top: 3px; }
+
+    /* ── Audit ledger ────────────────────────────────────────────────────────── */
+    .ledger-table { width: 100%; border-collapse: collapse; font-size: 11px; }
     .ledger-table th {
-      text-align: left;
-      color: var(--muted);
-      font-weight: 500;
-      padding: 6px 8px;
-      border-bottom: 1px solid var(--border);
+      text-align: left; color: var(--muted); font-weight: 500;
+      padding: 5px 6px; border-bottom: 1px solid var(--border);
     }
     .ledger-table td {
-      padding: 6px 8px;
-      border-bottom: 1px solid rgba(48,54,61,0.5);
-      font-family: 'Cascadia Code', 'Fira Code', monospace;
-      max-width: 200px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      padding: 5px 6px;
+      border-bottom: 1px solid rgba(48,54,61,0.4);
+      font-family: 'Cascadia Code','Fira Code',monospace;
+      max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .tier-0 { color: var(--muted); }
     .tier-1 { color: var(--accent); }
     .tier-2 { color: var(--yellow); }
     .tier-3 { color: var(--red); }
 
-    /* Events */
-    .event-list { list-style: none; }
-    .event-item {
+    /* ── Right: thinking panel ───────────────────────────────────────────────── */
+    .thinking-panel {
+      border-left: 1px solid var(--border);
       display: flex;
-      align-items: flex-start;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .thinking-panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
       gap: 8px;
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(48,54,61,0.5);
-      font-size: 12px;
-    }
-    .event-item:last-child { border-bottom: none; }
-    .salience-bar {
-      width: 4px;
-      border-radius: 2px;
       flex-shrink: 0;
-      align-self: stretch;
-      min-height: 20px;
     }
-    .event-text { color: var(--text); flex: 1; }
-    .event-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
-    .empty { color: var(--muted); font-style: italic; text-align: center; padding: 20px 0; }
-
-    .refresh-note {
-      text-align: center;
+    .thinking-panel-header h2 {
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
       color: var(--muted);
-      font-size: 11px;
-      padding: 16px;
     }
+    .thinking-tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .thinking-tab {
+      flex: 1;
+      padding: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      text-align: center;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .thinking-tab:hover { color: var(--text); }
+    .thinking-tab.active {
+      color: var(--purple);
+      border-bottom-color: var(--purple);
+    }
+
+    .thinking-view { display: none; flex: 1; overflow-y: auto; }
+    .thinking-view.active { display: flex; flex-direction: column; }
+
+    /* ── Live stream view ─────────────────────────────────────────────────── */
+    #stream-content {
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stream-cycle-header {
+      font-size: 10px;
+      color: var(--muted);
+      padding: 8px 0 4px;
+      border-top: 1px solid var(--border);
+      margin-top: 4px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .stream-cycle-header:first-child { border-top: none; }
+    .cycle-level {
+      font-size: 9px; font-weight: 600; text-transform: uppercase;
+      color: var(--purple);
+    }
+    .think-block {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #c9d1d9;
+      font-style: italic;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .message-block {
+      background: var(--msg-bg);
+      border: 1px solid rgba(63,185,80,0.2);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: var(--text);
+      margin: 4px 0;
+    }
+    .message-block-label {
+      font-size: 9px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--green); margin-bottom: 4px;
+    }
+    .memory-block {
+      background: rgba(88,166,255,0.06);
+      border-left: 2px solid var(--accent);
+      padding: 4px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      margin: 2px 0;
+    }
+    .cycle-stats {
+      font-size: 10px; color: var(--muted);
+      padding: 4px 0 8px;
+    }
+    .stream-empty {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-style: italic; font-size: 12px;
+      text-align: center; padding: 24px;
+    }
+
+    /* ── Communications view ──────────────────────────────────────────────── */
+    #comms-content {
+      padding: 12px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .comm-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .comm-card:last-child { margin-bottom: 0; }
+    .comm-card .header {
+      display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+    }
+    .comm-card .body {
+      font-size: 13px; line-height: 1.5;
+    }
+    .comm-card .footer {
+      font-size: 10px; color: var(--muted); margin-top: 6px;
+    }
+    .priority-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    }
+    .priority-dot.low    { background: var(--muted); }
+    .priority-dot.normal { background: var(--accent); }
+    .priority-dot.high   { background: var(--yellow); }
+    .priority-dot.urgent { background: var(--red); }
+    .delivered-check { margin-left: auto; color: var(--green); font-size: 11px; }
+
+    .empty { color: var(--muted); font-style: italic; text-align: center; padding: 16px; font-size: 12px; }
+    .refresh-note { text-align: center; color: var(--muted); font-size: 10px; padding: 10px; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -178,128 +335,305 @@
     <div class="pulse" id="status-dot"></div>
     <div>
       <h1>DAEMON</h1>
-      <div class="subtitle">Sidecar Dashboard</div>
+      <div class="subtitle">Continuous thinking sidecar</div>
     </div>
-    <div style="margin-left:auto; color:var(--muted); font-size:12px;" id="last-updated">—</div>
+    <div class="header-right">
+      <span id="thinking-badge">● thinking...</span>
+      <span id="last-updated">—</span>
+    </div>
   </header>
 
-  <main>
-    <!-- Consciousness -->
-    <div class="card">
-      <h2>Consciousness</h2>
-      <div class="consciousness-level" id="c-level">—</div>
-      <div class="sensor-pills" id="c-sensors"></div>
-      <div style="color:var(--muted);font-size:11px;margin-top:10px;" id="c-last-event"></div>
+  <div class="layout">
+    <!-- ── LEFT: status grid ─────────────────────────────────────────────── -->
+    <div class="status-panel">
+      <div class="cards-row">
+        <!-- Consciousness -->
+        <div class="card">
+          <h2>Consciousness</h2>
+          <div class="c-level" id="c-level">—</div>
+          <div class="sensor-pills" id="c-sensors"></div>
+          <div style="color:var(--muted);font-size:10px;margin-top:8px;" id="c-last-event"></div>
+        </div>
+
+        <!-- Memory & Ledger -->
+        <div class="card">
+          <h2>Memory &amp; Ledger</h2>
+          <div class="stat-grid">
+            <div><div class="stat-value" id="s-memory">—</div><div class="stat-label">Episodes</div></div>
+            <div><div class="stat-value" id="s-ledger">—</div><div class="stat-label">Ledger today</div></div>
+            <div><div class="stat-value" id="s-pending">—</div><div class="stat-label">Pending approvals</div></div>
+            <div><div class="stat-value" id="s-events">—</div><div class="stat-label">Salient/hr</div></div>
+          </div>
+        </div>
+
+        <!-- Costs + Bridge -->
+        <div class="card">
+          <h2>Costs &amp; Bridge</h2>
+          <div class="stat-grid" style="margin-bottom:10px;">
+            <div><div class="stat-value" id="s-cost-today">—</div><div class="stat-label">USD today</div></div>
+            <div><div class="stat-value" id="s-cost-hour">—</div><div class="stat-label">USD this hr</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="badge" id="bridge-badge">—</span>
+            <span class="bridge-detail" id="bridge-url" style="font-size:10px;"></span>
+          </div>
+          <div class="bridge-detail" id="bridge-sent"></div>
+        </div>
+      </div>
+
+      <!-- Recent communications (from thinking engine) -->
+      <div class="card">
+        <h2>Recent Communications from DAEMON</h2>
+        <ul class="comm-list" id="comm-list">
+          <li class="empty">No communications yet</li>
+        </ul>
+      </div>
+
+      <!-- Audit ledger -->
+      <div class="card">
+        <h2>Audit Ledger (last 20)</h2>
+        <div style="overflow-x:auto;">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>Tier</th><th>Tool</th><th>Side-effect</th><th>Rev.</th><th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="ledger-body">
+              <tr><td colspan="5" class="empty">No entries</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="refresh-note">Status auto-refreshes every 5s · Thinking stream is live (SSE)</div>
     </div>
 
-    <!-- Memory & Ledger -->
-    <div class="card">
-      <h2>Memory &amp; Ledger</h2>
-      <div class="stat-grid">
-        <div class="stat">
-          <div class="stat-value" id="s-memory">—</div>
-          <div class="stat-label">Stored episodes</div>
+    <!-- ── RIGHT: thinking panel ─────────────────────────────────────────── -->
+    <div class="thinking-panel">
+      <div class="thinking-panel-header">
+        <div class="pulse" id="stream-dot" style="background:var(--muted);animation:none;"></div>
+        <h2>Inner Monologue</h2>
+      </div>
+      <div class="thinking-tab-bar">
+        <div class="thinking-tab active" data-tab="stream" onclick="switchTab('stream')">Live Stream</div>
+        <div class="thinking-tab" data-tab="comms" onclick="switchTab('comms')">Communications <span id="comm-badge" style="display:none;background:var(--purple);color:#fff;border-radius:8px;padding:1px 6px;font-size:9px;"></span></div>
+      </div>
+
+      <!-- Stream view -->
+      <div class="thinking-view active" id="tab-stream">
+        <div id="stream-content">
+          <div class="stream-empty" id="stream-empty">
+            Waiting for next thinking cycle...<br>
+            <span style="font-size:10px;margin-top:8px;display:block;">DAEMON will begin thinking when sensors detect activity.</span>
+          </div>
         </div>
-        <div class="stat">
-          <div class="stat-value" id="s-ledger">—</div>
-          <div class="stat-label">Ledger entries today</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value" id="s-pending">—</div>
-          <div class="stat-label">Pending approvals</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value" id="s-events">—</div>
-          <div class="stat-label">Salient events / hr</div>
+      </div>
+
+      <!-- Communications view -->
+      <div class="thinking-view" id="tab-comms">
+        <div id="comms-content">
+          <div class="empty">No communications yet</div>
         </div>
       </div>
     </div>
-
-    <!-- Costs -->
-    <div class="card">
-      <h2>Cost Tracker</h2>
-      <div class="stat-grid">
-        <div class="stat">
-          <div class="stat-value" id="s-cost-today">—</div>
-          <div class="stat-label">USD today</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value" id="s-cost-hour">—</div>
-          <div class="stat-label">USD this hour</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Bridge -->
-    <div class="card">
-      <h2>OpenClaw Bridge</h2>
-      <div class="bridge-row">
-        <span class="badge" id="bridge-badge">—</span>
-        <span class="bridge-detail" id="bridge-url">—</span>
-      </div>
-      <div class="bridge-detail" id="bridge-sent"></div>
-      <div class="bridge-detail" id="bridge-queued"></div>
-      <div class="bridge-detail" id="bridge-connected-at"></div>
-    </div>
-
-    <!-- Recent salient events -->
-    <div class="card wide">
-      <h2>Recent High-Salience Events</h2>
-      <ul class="event-list" id="event-list">
-        <li class="empty">No events yet</li>
-      </ul>
-    </div>
-
-    <!-- Audit ledger -->
-    <div class="card wide">
-      <h2>Audit Ledger (last 20)</h2>
-      <div style="overflow-x:auto;">
-        <table class="ledger-table">
-          <thead>
-            <tr>
-              <th>Tier</th>
-              <th>Tool</th>
-              <th>Side-effect</th>
-              <th>Reversible</th>
-              <th>Timestamp</th>
-            </tr>
-          </thead>
-          <tbody id="ledger-body">
-            <tr><td colspan="5" class="empty">No entries</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </main>
-
-  <div class="refresh-note">Auto-refreshes every 5 seconds</div>
+  </div>
 
   <script>
-    const TIER_LABELS = ['read-only', 'logged', 'approval-req', 'destructive'];
-    const TIER_CLASS  = ['tier-0',   'tier-1', 'tier-2',       'tier-3'];
-
-    function salienceColor(s) {
-      if (s >= 0.8) return '#f85149';
-      if (s >= 0.6) return '#d29922';
-      if (s >= 0.4) return '#58a6ff';
-      return '#8b949e';
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    function switchTab(name) {
+      document.querySelectorAll('.thinking-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === name);
+      });
+      document.querySelectorAll('.thinking-view').forEach(v => {
+        v.classList.toggle('active', v.id === 'tab-' + name);
+      });
+      if (name === 'comms') {
+        const badge = document.getElementById('comm-badge');
+        badge.style.display = 'none';
+      }
     }
 
+    // ── SSE: live thinking stream ─────────────────────────────────────────────
+    const streamContent = document.getElementById('stream-content');
+    const streamEmpty   = document.getElementById('stream-empty');
+    const streamDot     = document.getElementById('stream-dot');
+    const thinkBadge    = document.getElementById('thinking-badge');
+
+    let currentCycleEl = null;  // active cycle container
+    let currentThinkEl = null;  // active <think> text node
+    let currentMode    = null;
+
+    const TIER_LABELS = ['read-only','logged','approval-req','destructive'];
+    const TIER_CLASS  = ['tier-0','tier-1','tier-2','tier-3'];
+
+    const sse = new EventSource('/api/thinking/stream');
+
+    sse.onopen = () => {
+      streamDot.style.background = 'var(--purple)';
+      streamDot.style.animation = 'pulse 2s infinite';
+    };
+
+    sse.onerror = () => {
+      streamDot.style.background = 'var(--red)';
+      streamDot.style.animation = 'none';
+    };
+
+    sse.onmessage = (e) => {
+      let event;
+      try { event = JSON.parse(e.data); } catch { return; }
+
+      if (event.type === 'keepalive') return;
+
+      if (event.type === 'cycle_start') {
+        handleCycleStart(event);
+        return;
+      }
+      if (event.type === 'chunk') {
+        handleChunk(event);
+        return;
+      }
+      if (event.type === 'cycle_end') {
+        handleCycleEnd(event);
+        return;
+      }
+      if (event.type === 'communication') {
+        handleCommunication(event);
+        return;
+      }
+    };
+
+    function handleCycleStart(ev) {
+      streamEmpty.style.display = 'none';
+      thinkBadge.classList.add('active');
+      streamDot.style.background = 'var(--purple)';
+
+      // Create cycle container
+      const div = document.createElement('div');
+      div.className = 'cycle-container';
+      div.dataset.cycleId = ev.cycle_id;
+
+      const header = document.createElement('div');
+      header.className = 'stream-cycle-header';
+      header.innerHTML = `
+        <span class="cycle-level">${ev.consciousness_level || ''}</span>
+        <span>${fmtTime(ev.timestamp)}</span>
+      `;
+      div.appendChild(header);
+      streamContent.appendChild(div);
+      currentCycleEl = div;
+      currentThinkEl = null;
+      currentMode = null;
+
+      // Auto-scroll
+      streamContent.scrollTop = streamContent.scrollHeight;
+    }
+
+    function handleChunk(ev) {
+      if (!currentCycleEl) return;
+      const mode = ev.mode;
+
+      if (mode !== currentMode) {
+        currentMode = mode;
+        currentThinkEl = null;
+      }
+
+      if (mode === 'think') {
+        if (!currentThinkEl) {
+          currentThinkEl = document.createElement('div');
+          currentThinkEl.className = 'think-block';
+          currentCycleEl.appendChild(currentThinkEl);
+        }
+        currentThinkEl.textContent += ev.text;
+      } else if (mode === 'message') {
+        if (!currentThinkEl) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'message-block';
+          const label = document.createElement('div');
+          label.className = 'message-block-label';
+          label.textContent = 'Message to user';
+          wrapper.appendChild(label);
+          currentThinkEl = document.createElement('div');
+          wrapper.appendChild(currentThinkEl);
+          currentCycleEl.appendChild(wrapper);
+        }
+        currentThinkEl.textContent += ev.text;
+      } else if (mode === 'memory') {
+        if (!currentThinkEl) {
+          currentThinkEl = document.createElement('div');
+          currentThinkEl.className = 'memory-block';
+          currentCycleEl.appendChild(currentThinkEl);
+        }
+        currentThinkEl.textContent += ev.text;
+      }
+
+      streamContent.scrollTop = streamContent.scrollHeight;
+    }
+
+    function handleCycleEnd(ev) {
+      thinkBadge.classList.remove('active');
+      const s = ev.summary || {};
+      if (currentCycleEl) {
+        const stats = document.createElement('div');
+        stats.className = 'cycle-stats';
+        stats.textContent = `${s.tokens_used || 0} tokens · ${s.duration_ms || 0}ms · ${s.communications || 0} msg · ${s.memories_stored || 0} memories`;
+        currentCycleEl.appendChild(stats);
+      }
+      currentCycleEl = null;
+      currentThinkEl = null;
+      currentMode = null;
+    }
+
+    function handleCommunication(ev) {
+      const comm = ev.communication;
+      if (!comm) return;
+      appendCommunicationCard(comm);
+
+      // Badge on comms tab if not active
+      const activeTab = document.querySelector('.thinking-tab.active');
+      if (!activeTab || activeTab.dataset.tab !== 'comms') {
+        const badge = document.getElementById('comm-badge');
+        badge.textContent = '+1';
+        badge.style.display = 'inline';
+      }
+    }
+
+    function appendCommunicationCard(comm) {
+      const content = document.getElementById('comms-content');
+      // Remove empty placeholder
+      const empty = content.querySelector('.empty');
+      if (empty) empty.remove();
+
+      const card = document.createElement('div');
+      card.className = 'comm-card';
+      card.innerHTML = `
+        <div class="header">
+          <div class="priority-dot ${comm.priority}"></div>
+          <span style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--muted);">${comm.priority}</span>
+          ${comm.delivered ? '<span class="delivered-check" title="Delivered">✓ sent</span>' : ''}
+        </div>
+        <div class="body">${esc(comm.content)}</div>
+        <div class="footer">${fmtTime(comm.timestamp)}</div>
+      `;
+      // Prepend so newest is at top
+      content.insertBefore(card, content.firstChild);
+    }
+
+    // ── REST polling: status overview ─────────────────────────────────────────
     async function fetchJSON(url) {
       const r = await fetch(url);
       if (!r.ok) throw new Error(r.statusText);
       return r.json();
     }
 
-    async function refresh() {
+    async function refreshStatus() {
       try {
-        const [overview, events, ledger] = await Promise.all([
+        const [overview, ledger, commsData] = await Promise.all([
           fetchJSON('/api/dashboard/overview'),
-          fetchJSON('/api/perception/events?min_salience=0.3&minutes=60'),
-          fetchJSON('/api/dashboard/ledger?limit=20'),
+          fetchJSON('/api/dashboard/ledger?limit=20').catch(() => ({ entries: [] })),
+          fetchJSON('/api/thinking/communications?limit=20'),
         ]);
 
-        // Status dot
         document.getElementById('status-dot').className = 'pulse';
         document.getElementById('last-updated').textContent =
           'Updated ' + new Date().toLocaleTimeString();
@@ -307,63 +641,61 @@
         // Consciousness
         const level = overview.consciousness;
         const el = document.getElementById('c-level');
-        el.textContent = level.replace('_', ' ');
-        el.className = 'consciousness-level ' + level;
+        el.textContent = level.replace(/_/g, ' ');
+        el.className = 'c-level ' + level;
 
         const sensors = document.getElementById('c-sensors');
         sensors.innerHTML = (overview.active_sensors || [])
-          .map(s => `<span class="pill">${s}</span>`)
-          .join('') || '<span style="color:var(--muted);font-size:12px;">no sensors active</span>';
+          .map(s => `<span class="pill">${s}</span>`).join('') ||
+          '<span style="color:var(--muted);font-size:10px;">no sensors active</span>';
 
-        const lastEvent = overview.last_significant_event;
+        const lastEv = overview.last_significant_event;
         document.getElementById('c-last-event').textContent =
-          lastEvent ? 'Last event: ' + new Date(lastEvent).toLocaleTimeString() : '';
+          lastEv ? 'Last event: ' + new Date(lastEv).toLocaleTimeString() : '';
 
         // Stats
         document.getElementById('s-memory').textContent = fmt(overview.memory_count);
         document.getElementById('s-ledger').textContent = fmt(overview.ledger_entries_today);
-        const pending = overview.pending_approvals;
+        const pend = overview.pending_approvals;
         const pendEl = document.getElementById('s-pending');
-        pendEl.textContent = fmt(pending);
-        pendEl.className = 'stat-value' + (pending > 0 ? ' warn' : ' ok');
+        pendEl.textContent = fmt(pend);
+        pendEl.className = 'stat-value' + (pend > 0 ? ' warn' : ' ok');
         document.getElementById('s-events').textContent = fmt(overview.salient_events_last_hour);
-
-        // Costs
-        document.getElementById('s-cost-today').textContent =
-          '$' + (overview.costs_today || 0).toFixed(4);
-        document.getElementById('s-cost-hour').textContent =
-          '$' + (overview.costs_this_hour || 0).toFixed(4);
+        document.getElementById('s-cost-today').textContent = '$' + (overview.costs_today || 0).toFixed(4);
+        document.getElementById('s-cost-hour').textContent = '$' + (overview.costs_this_hour || 0).toFixed(4);
 
         // Bridge
         const br = overview.bridge || {};
-        const badge = document.getElementById('bridge-badge');
-        badge.textContent = br.connected ? 'Connected' : 'Offline';
-        badge.className = 'badge ' + (br.connected ? 'ok' : 'error');
+        const bdg = document.getElementById('bridge-badge');
+        bdg.textContent = br.connected ? 'Connected' : 'Offline';
+        bdg.className = 'badge ' + (br.connected ? 'ok' : 'error');
         document.getElementById('bridge-url').textContent = br.gateway_url || '';
         document.getElementById('bridge-sent').textContent =
-          `${fmt(br.messages_sent || 0)} messages sent`;
-        document.getElementById('bridge-queued').textContent =
-          `${fmt(br.queued_messages || 0)} queued`;
-        document.getElementById('bridge-connected-at').textContent =
-          br.connected_at ? 'Since ' + new Date(br.connected_at).toLocaleTimeString() : '';
+          `${fmt(br.messages_sent || 0)} sent · ${fmt(br.queued_messages || 0)} queued`;
 
-        // Events
-        const evList = document.getElementById('event-list');
-        const evs = (events.events || []).slice(0, 10);
-        if (evs.length === 0) {
-          evList.innerHTML = '<li class="empty">No salient events in the last hour</li>';
+        // Recent communications list (sidebar)
+        const commList = document.getElementById('comm-list');
+        const comms = (commsData.communications || []).slice(-5).reverse();
+        if (comms.length === 0) {
+          commList.innerHTML = '<li class="empty">No communications yet</li>';
         } else {
-          evList.innerHTML = evs.map(e => `
-            <li class="event-item">
-              <div class="salience-bar" style="background:${salienceColor(e.salience)}"></div>
-              <div>
-                <div class="event-text">${esc(e.transcription || '(no text)')}</div>
-                <div class="event-meta">
-                  ${e.sensor_type} &middot; salience ${(e.salience * 100).toFixed(0)}%
-                  &middot; ${fmtTime(e.timestamp)}
-                </div>
-              </div>
+          commList.innerHTML = comms.map(c => `
+            <li class="comm-item">
+              <div class="comm-priority ${c.priority}">${c.priority}${c.delivered ? ' · ✓ sent' : ''}</div>
+              <div>${esc(c.content)}</div>
+              <div class="comm-time">${fmtTime(c.timestamp)}</div>
             </li>`).join('');
+        }
+
+        // Populate comms tab on first load
+        const commsContent = document.getElementById('comms-content');
+        if (commsContent.children.length === 0 || commsContent.querySelector('.empty')) {
+          commsContent.innerHTML = '';
+          if (commsData.communications.length === 0) {
+            commsContent.innerHTML = '<div class="empty">No communications yet</div>';
+          } else {
+            [...commsData.communications].reverse().forEach(c => appendCommunicationCard(c));
+          }
         }
 
         // Ledger
@@ -374,9 +706,7 @@
         } else {
           tbody.innerHTML = entries.map(e => `
             <tr>
-              <td class="${TIER_CLASS[e.permission_tier] || 'tier-0'}">
-                T${e.permission_tier} ${TIER_LABELS[e.permission_tier] || ''}
-              </td>
+              <td class="${TIER_CLASS[e.permission_tier] || 'tier-0'}">T${e.permission_tier} ${TIER_LABELS[e.permission_tier] || ''}</td>
               <td>${esc(e.tool_name)}</td>
               <td>${esc(e.side_effect_type)}</td>
               <td>${e.reversible ? '✓' : '✗'}</td>
@@ -390,6 +720,7 @@
       }
     }
 
+    // ── Utilities ─────────────────────────────────────────────────────────────
     function fmt(n) { return (n || 0).toLocaleString(); }
     function esc(s) {
       return String(s)
@@ -397,11 +728,12 @@
     }
     function fmtTime(ts) {
       if (!ts) return '';
-      return new Date(ts).toLocaleTimeString();
+      return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    refresh();
-    setInterval(refresh, 5000);
+    // Kick off
+    refreshStatus();
+    setInterval(refreshStatus, 5000);
   </script>
 </body>
 </html>

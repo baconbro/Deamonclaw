@@ -57,6 +57,20 @@ class SafetyConfig:
 
 
 @dataclass
+class ThinkingConfig:
+    enabled: bool = True
+    model: str = "claude-sonnet-4-6"
+    max_tokens: int = 1024
+    # Thinking cadence per consciousness level (seconds). 0 = disabled at that level.
+    cadence_focused: int = 20
+    cadence_engaged: int = 45
+    cadence_ambient: int = 120
+    cadence_light_sleep: int = 600
+    # Automatically deliver <message> blocks to user via bridge
+    auto_communicate: bool = True
+
+
+@dataclass
 class DaemonConfig:
     memory_db_url: str = "postgresql://daemon:daemon@localhost:5433/daemon"
     openclaw_gateway_url: str = "ws://localhost:18789"
@@ -66,6 +80,7 @@ class DaemonConfig:
     consciousness: ConsciousnessConfig = field(default_factory=ConsciousnessConfig)
     proactive: ProactiveConfig = field(default_factory=ProactiveConfig)
     safety: SafetyConfig = field(default_factory=SafetyConfig)
+    thinking: ThinkingConfig = field(default_factory=ThinkingConfig)
 
 
 def load_config(path: str = "daemon.yaml") -> DaemonConfig:
@@ -97,5 +112,8 @@ def load_config(path: str = "daemon.yaml") -> DaemonConfig:
     if "safety" in raw:
         s = raw["safety"]
         cfg.safety = SafetyConfig(**{k: v for k, v in s.items() if hasattr(SafetyConfig, k)})
+    if "thinking" in raw:
+        t = raw["thinking"]
+        cfg.thinking = ThinkingConfig(**{k: v for k, v in t.items() if hasattr(ThinkingConfig, k)})
 
     return cfg

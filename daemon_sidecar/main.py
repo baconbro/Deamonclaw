@@ -1,15 +1,16 @@
 """
 DAEMON Sidecar — runs alongside OpenClaw, provides:
 
-1. Perception pipeline  (audio / video / screen sensors)          Phase 2
-2. Structured memory    (PostgreSQL + pgvector, vector recall)     Phase 2
-3. Safety layer         (permission tiers, side-effect ledger)     Phase 1
-4. Consciousness mgr    (sleep/wake states, power levels)          Phase 1
-5. Proactive engine     (interrupt budget, quiet hours)            Phase 1
-6. Context builder      (daemon_context XML injection)             Phase 3
-7. Bridge management    (queue, reconnect, status)                 Phase 3
-8. REST API             (called by OpenClaw skills)                Phase 1
-9. Web dashboard        (served at /)                              Phase 4
+1. Perception pipeline      (audio / video / screen sensors)          Phase 2
+2. Structured memory        (PostgreSQL + pgvector, vector recall)     Phase 2
+3. Safety layer             (permission tiers, side-effect ledger)     Phase 1
+4. Consciousness mgr        (sleep/wake states, power levels)          Phase 1
+5. Proactive engine         (interrupt budget, quiet hours)            Phase 1
+6. Context builder          (daemon_context XML injection)             Phase 3
+7. Bridge management        (queue, reconnect, status)                 Phase 3
+8. Continuous thinking      (Claude-powered inner monologue + comms)   Phase 5
+9. REST API                 (called by OpenClaw skills)                Phase 1
+10. Web dashboard           (served at /)                              Phase 4
 
 Communication with OpenClaw:
   • REST API           — OpenClaw skills → sidecar (Integration Point 1)
@@ -20,12 +21,14 @@ Communication with OpenClaw:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import pathlib
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -52,12 +55,19 @@ from daemon_sidecar.perception.bus import PerceptionBus
 from daemon_sidecar.proactive.engine import ProactiveEngine
 from daemon_sidecar.safety.ledger import SideEffectLedger
 from daemon_sidecar.safety.permissions import PermissionGate
+from daemon_sidecar.thinking.engine import ContinuousThinkingEngine
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+_HERE = pathlib.Path(__file__).parent
+_STATIC = _HERE / "static"
+_TEMPLATES_DIR = _HERE / "templates"
+_STATIC.mkdir(exist_ok=True)
+_TEMPLATES_DIR.mkdir(exist_ok=True)
 
 
 @asynccontextmanager
@@ -125,28 +135,32 @@ async def lifespan(app: FastAPI):
         scorer=app.state.scorer,
     )
 
+    # ── Continuous thinking engine (Phase 5) ──────────────────────────────────
+    app.state.thinking = ContinuousThinkingEngine(
+        config=config.thinking,
+        consciousness=app.state.consciousness,
+        perception=app.state.perception,
+        memory=app.state.memory,
+        bridge=app.state.bridge,
+        anthropic_api_key=config.anthropic_api_key,
+    )
+    await app.state.thinking.start()
+
     logger.info("DAEMON sidecar ready on port %d", config.api_port)
     yield
 
     # ── Shutdown ──────────────────────────────────────────────────────────────
+    await app.state.thinking.stop()
     await app.state.perception.stop()
     logger.info("DAEMON sidecar stopped")
 
 
 app = FastAPI(
     title="DAEMON Sidecar",
-    description="Perception, memory, and safety layer for OpenClaw",
-    version="0.2.0",
+    description="Perception, memory, safety, and continuous thinking for OpenClaw",
+    version="0.3.0",
     lifespan=lifespan,
 )
-
-# ── Static files + Jinja2 templates (Phase 4 dashboard) ───────────────────────
-import pathlib
-_HERE = pathlib.Path(__file__).parent
-_STATIC = _HERE / "static"
-_TEMPLATES_DIR = _HERE / "templates"
-_STATIC.mkdir(exist_ok=True)
-_TEMPLATES_DIR.mkdir(exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
@@ -166,42 +180,35 @@ def _require_ledger() -> SideEffectLedger:
     return ledger
 
 
-# ── Dashboard (Phase 4) ────────────────────────────────────────────────────────
+# ── Dashboard ──────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard_ui(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
-# ── Memory API (Integration Point 1: called by daemon-memory skill) ───────────
+# ── Memory API ─────────────────────────────────────────────────────────────────
 
 @app.post("/api/memory/store")
 async def store_memory(request: StoreMemoryRequest) -> dict[str, Any]:
     memory = _require_memory()
     episode = Episode.from_request(request)
-
-    # Generate and attach embedding if scorer is available
     embedding = await app.state.scorer.embed(f"{episode.goal} {episode.outcome}")
     if embedding:
         await memory.store_with_embedding(episode, embedding)
     else:
         await memory.store(episode)
-
     return {"stored": True, "id": episode.id}
 
 
 @app.post("/api/memory/recall")
 async def recall_memory(request: RecallRequest) -> dict[str, Any]:
     memory = _require_memory()
-
-    # Try vector recall first
     embedding = await app.state.scorer.embed(request.query)
     if embedding:
         results = await memory.recall_semantic(embedding, limit=request.limit)
         if results:
             return {"memories": [r.to_summary() for r in results], "method": "semantic"}
-
-    # Fall back to text search
     results = await memory.recall(query=request.query, limit=request.limit)
     return {"memories": [r.to_summary() for r in results], "method": "text"}
 
@@ -213,7 +220,7 @@ async def recent_memories(limit: int = 10) -> dict[str, Any]:
     return {"memories": [r.to_summary() for r in results]}
 
 
-# ── Safety API (Integration Point 1: called by daemon-safety skill) ───────────
+# ── Safety API ─────────────────────────────────────────────────────────────────
 
 @app.post("/api/safety/check")
 async def check_permission(request: PermissionCheckRequest) -> dict[str, Any]:
@@ -228,7 +235,7 @@ async def log_action(request: LogActionRequest) -> dict[str, Any]:
     return {"logged": True}
 
 
-# ── Perception API (Integration Point 1: called by daemon-perception skill) ───
+# ── Perception API ─────────────────────────────────────────────────────────────
 
 @app.get("/api/perception/audio/recent")
 async def recent_audio(minutes: int = 30) -> dict[str, Any]:
@@ -293,7 +300,7 @@ async def sleep() -> dict[str, Any]:
     return {"level": "DEEP_SLEEP"}
 
 
-# ── Bridge API (Phase 3) ───────────────────────────────────────────────────────
+# ── Bridge API ─────────────────────────────────────────────────────────────────
 
 class InjectContextRequest(BaseModel):
     user_query: str = ""
@@ -303,12 +310,6 @@ class InjectContextRequest(BaseModel):
 
 @app.post("/api/bridge/inject-context")
 async def inject_context(request: InjectContextRequest) -> dict[str, Any]:
-    """
-    Build and inject <daemon_context> into OpenClaw's next LLM call.
-
-    Called by OpenClaw's skill system before each agent response when the
-    daemon-context skill is active.
-    """
     context_xml = await app.state.context_builder.build(
         user_query=request.user_query,
         audio_minutes=request.audio_minutes,
@@ -321,8 +322,70 @@ async def inject_context(request: InjectContextRequest) -> dict[str, Any]:
 
 @app.get("/api/bridge/status")
 async def bridge_status() -> dict[str, Any]:
-    """Return OpenClaw bridge connection health."""
     return app.state.bridge.status()
+
+
+# ── Thinking API (Phase 5) ─────────────────────────────────────────────────────
+
+@app.get("/api/thinking/stream")
+async def thinking_stream(request: Request) -> StreamingResponse:
+    """
+    Server-Sent Events stream of live thinking output.
+
+    Each event is a JSON object with type:
+      cycle_start   — new thinking cycle beginning
+      chunk         — streaming text chunk (mode: think|message|memory|unknown)
+      cycle_end     — cycle complete with summary stats
+      communication — a user communication was generated
+      keepalive     — connection keepalive (every 15s of silence)
+    """
+    engine: ContinuousThinkingEngine = app.state.thinking
+    q: asyncio.Queue = asyncio.Queue(maxsize=500)
+    engine.add_subscriber(q)
+
+    async def generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=15.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield 'data: {"type":"keepalive"}\n\n'
+        finally:
+            engine.remove_subscriber(q)
+
+    return StreamingResponse(
+        generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.get("/api/thinking/history")
+async def thinking_history(limit: int = 20) -> dict[str, Any]:
+    """Return the last N completed thinking cycles."""
+    return {"cycles": app.state.thinking.get_history(limit)}
+
+
+@app.get("/api/thinking/communications")
+async def thinking_communications(limit: int = 50) -> dict[str, Any]:
+    """Return the last N user communications generated by the thinking engine."""
+    return {"communications": app.state.thinking.get_communications(limit)}
+
+
+@app.post("/api/thinking/trigger")
+async def trigger_thinking() -> dict[str, Any]:
+    """Manually trigger an immediate thinking cycle (useful for testing)."""
+    cycle_id = await app.state.thinking.trigger_cycle()
+    if not cycle_id:
+        raise HTTPException(503, "Thinking engine not available")
+    return {"cycle_id": cycle_id, "triggered": True}
 
 
 # ── Dashboard API ──────────────────────────────────────────────────────────────
@@ -334,6 +397,7 @@ async def dashboard_overview() -> dict[str, Any]:
     ledger_today = await app.state.ledger.count_today() if app.state.ledger else 0
     pending = await app.state.permissions.pending_count()
     salient = await app.state.perception.get_salient_events(min_salience=0.5, minutes=60)
+    recent_comms = app.state.thinking.get_communications(limit=3)
     return {
         "consciousness": c.current_level.name,
         "active_sensors": c.active_sensors(),
@@ -345,6 +409,7 @@ async def dashboard_overview() -> dict[str, Any]:
         "pending_approvals": pending,
         "salient_events_last_hour": len(salient),
         "bridge": app.state.bridge.status(),
+        "recent_communications": recent_comms,
     }
 
 
@@ -352,7 +417,6 @@ async def dashboard_overview() -> dict[str, Any]:
 async def dashboard_ledger(limit: int = 20) -> dict[str, Any]:
     ledger = _require_ledger()
     entries = await ledger.get_recent(limit)
-    # Convert datetime objects for JSON
     for e in entries:
         if hasattr(e.get("timestamp"), "isoformat"):
             e["timestamp"] = e["timestamp"].isoformat()

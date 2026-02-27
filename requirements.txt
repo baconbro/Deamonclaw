@@ -31,3 +31,6 @@ numpy>=1.26.0
 
 # ── Phase 2: Embedding-based salience ─────────────────────────────────────────
 sentence-transformers>=3.0.0
+
+# ── Continuous thinking engine (Claude API) ────────────────────────────────────
+anthropic>=0.40.0
